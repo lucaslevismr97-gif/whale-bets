@@ -1,148 +1,168 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Whale Bets</title>
-<style>
-body{
-  margin:0;
-  background:#0b0f14;
-  color:white;
-  font-family:Arial,sans-serif;
-}
-.app{
-  max-width:480px;
-  margin:auto;
-  padding:20px;
-}
-h1{margin-bottom:5px}
-.sub{color:#8d99a8;margin-bottom:20px}
-.card{
-  background:#18212c;
-  border:1px solid #293646;
-  border-radius:16px;
-  padding:16px;
-  margin-bottom:12px;
-}
-.value{
-  font-size:27px;
-  font-weight:bold;
-  margin:12px 0;
-}
-.row{
-  display:flex;
-  justify-content:space-between;
-  margin:8px 0;
-}
-.muted{color:#9aa6b5}
-.alert{
-  border-color:#ff4650;
-}
-.badge{
-  color:#ff6b73;
-  font-weight:bold;
-}
-button{
-  width:100%;
-  padding:14px;
-  border:0;
-  border-radius:12px;
-  background:#276cff;
-  color:white;
-  font-size:16px;
-  font-weight:bold;
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Whale Bets</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: white;
+    }
+
+    header {
+      padding: 25px;
+      text-align: center;
+      background: #181818;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 32px;
+    }
+
+    .subtitulo {
+      color: #aaa;
+      margin-top: 8px;
+    }
+
+    .filtro {
+      text-align: center;
+      padding: 20px;
+      background: #151515;
+    }
+
+    .valor {
+      font-size: 26px;
+      font-weight: bold;
+    }
+
+    #status {
+      margin-top: 8px;
+      color: #aaa;
+    }
+
+    #bets {
+      max-width: 900px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    .aposta {
+      background: #1c1c1c;
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 15px;
+      border: 1px solid #333;
+    }
+
+    .valor-aposta {
+      font-size: 25px;
+      font-weight: bold;
+    }
+
+    .detalhes {
+      color: #bbb;
+      margin-top: 10px;
+      line-height: 1.6;
+    }
+
+    .atualizar {
+      display: block;
+      margin: 10px auto 25px;
+      padding: 12px 25px;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+  </style>
 </head>
 
 <body>
 
-<div class="app">
+<header>
+  <h1>🐋 Whale Bets</h1>
+  <div class="subtitulo">Apostas de alto valor</div>
+</header>
 
-<h1>🐋 Whale Bets</h1>
-<div class="sub">Apostas acima de US$ 100.000 — últimas 24h</div>
-
-<div class="card alert">
-<div class="badge">🔴 NOVA APOSTA</div>
-<div class="value">US$ 850.000</div>
-
-<div class="row">
-<span class="muted">Apostador</span>
-<b>Bajarangg83</b>
+<div class="filtro">
+  <div class="valor">US$ 100.000+</div>
+  <div>Últimas 24 horas</div>
+  <div id="status">Carregando...</div>
 </div>
 
-<div class="row">
-<span class="muted">Esporte</span>
-<b>Futebol</b>
-</div>
+<button class="atualizar" onclick="carregarApostas()">
+  🔄 Atualizar apostas
+</button>
 
-<div class="row">
-<span class="muted">Odd</span>
-<b>1.76</b>
-</div>
+<div id="bets"></div>
 
-<div class="row">
-<span class="muted">Horário</span>
-<b>Agora</b>
-</div>
-</div>
+<script>
+const API = "https://whale-bets.onrender.com/bets";
 
-<div class="card">
-<div class="value">US$ 584.200</div>
+async function carregarApostas() {
+  const status = document.getElementById("status");
+  const container = document.getElementById("bets");
 
-<div class="row">
-<span class="muted">Apostador</span>
-<b>SpinEng</b>
-</div>
+  status.textContent = "Atualizando...";
 
-<div class="row">
-<span class="muted">Esporte</span>
-<b>Futebol</b>
-</div>
+  try {
+    const resposta = await fetch(API);
 
-<div class="row">
-<span class="muted">Odd</span>
-<b>1.12</b>
-</div>
-</div>
+    if (!resposta.ok) {
+      throw new Error("Erro ao consultar servidor");
+    }
 
-<div class="card">
-<div class="value">US$ 449.700</div>
+    const apostas = await resposta.json();
 
-<div class="row">
-<span class="muted">Apostador</span>
-<b>SpinEng</b>
-</div>
+    container.innerHTML = "";
 
-<div class="row">
-<span class="muted">Esporte</span>
-<b>Futebol</b>
-</div>
+    if (apostas.length === 0) {
+      container.innerHTML = `
+        <div class="aposta">
+          Nenhuma aposta acima de US$ 100.000 nas últimas 24 horas.
+        </div>
+      `;
+    }
 
-<div class="row">
-<span class="muted">Odd</span>
-<b>1.16</b>
-</div>
-</div>
+    apostas.forEach(aposta => {
+      const data = new Date(aposta.timestamp);
 
-<div class="card">
-<h3>⚙️ Filtros</h3>
+      container.innerHTML += `
+        <div class="aposta">
+          <div class="valor-aposta">
+            US$ ${Number(aposta.amount_usd).toLocaleString("en-US")}
+          </div>
 
-<div class="row">
-<span class="muted">Valor mínimo</span>
-<b>US$ 100.000</b>
-</div>
+          <div class="detalhes">
+            🐋 Apostador: ${aposta.bettor || "Desconhecido"}<br>
+            ⚽ Esporte: ${aposta.sport || "-"}<br>
+            🎯 Mercado: ${aposta.market || "-"}<br>
+            📈 Odd: ${aposta.odds || "-"}<br>
+            🕐 ${data.toLocaleString("pt-BR")}
+          </div>
+        </div>
+      `;
+    });
 
-<div class="row">
-<span class="muted">Período</span>
-<b>24 horas</b>
-</div>
+    status.textContent =
+      ${apostas.length} aposta(s) encontrada(s);
 
-<button>🔔 Ativar alertas</button>
-</div>
+  } catch (erro) {
+    console.error(erro);
+    status.textContent = "Erro ao conectar ao servidor.";
+  }
+}
 
-</div>
+carregarApostas();
+
+// Atualiza automaticamente a cada 60 segundos
+setInterval(carregarApostas, 60000);
+</script>
 
 </body>
 </html>
