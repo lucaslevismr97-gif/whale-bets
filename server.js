@@ -5,63 +5,58 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// Filtro padrão do Whale Bets
-const MIN_BET_USD = 100000;
+// US$ 100.000 em USDC (6 casas decimais)
+const MIN_BET_SIZE = 100000000000;
 
-// Dados de demonstração
-let bets = [
-  {
-    bettor: "DemoWhale",
-    sport: "Futebol",
-    market: "Demonstração",
-    amount_usd: 250000,
-    odds: 1.80,
-    timestamp: new Date().toISOString()
-  }
-];
-
-// Página inicial da API
 app.get("/", (req, res) => {
   res.json({
     app: "Whale Bets",
     status: "online",
-    minimum_bet_usd: MIN_BET_USD,
-    period: "24 horas"
+    source: "SX Bet",
+    minimum_usd: 100000
   });
 });
 
-// Retorna somente apostas acima de US$ 100 mil
-app.get("/bets", (req, res) => {
-  const now = Date.now();
-  const last24h = now - 24 * 60 * 60 * 1000;
+app.get("/bets", async (req, res) => {
+  try {
+    const response = await fetch("https://api.sx.bet/orders");
 
-  const filtered = bets
-    .filter(bet => bet.amount_usd >= MIN_BET_USD)
-    .filter(bet => new Date(bet.timestamp).getTime() >= last24h)
-    .sort((a, b) => b.amount_usd - a.amount_usd);
+    if (!response.ok) {
+      throw new Error(`SX Bet respondeu ${response.status}`);
+    }
 
-  res.json(filtered);
-});
+    const data = await response.json();
 
-// Endpoint para uma fonte autorizada enviar novas apostas
-app.post("/bets", (req, res) => {
-  const bet = req.body;
+    const orders = Array.isArray(data)
+      ? data
+      : data.data  data.orders  [];
 
-  if (!bet.amount_usd || bet.amount_usd < MIN_BET_USD) {
-    return res.status(400).json({
-      error: "A aposta precisa ser de pelo menos US$ 100.000"
+    const whales = orders
+      .filter(order => {
+        const size = BigInt(order.totalBetSize || "0");
+        return size >= BigInt(MIN_BET_SIZE);
+      })
+      .filter(order => order.orderStatus === "ACTIVE")
+      .map(order => ({
+        marketHash: order.marketHash,
+        orderHash: order.orderHash,
+        value_usd: Number(order.totalBetSize) / 1000000,
+        odds: Number(order.percentageOdds) / 1000000000000000000,
+        eventId: order.sportXeventId,
+        status: order.orderStatus
+      }))
+      .sort((a, b) => b.value_usd - a.value_usd);
+
+    res.json(whales);
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      error: "Não foi possível consultar a SX Bet",
+      details: error.message
     });
   }
-
-  bets.push({
-    ...bet,
-    timestamp: bet.timestamp || new Date().toISOString()
-  });
-
-  res.json({
-    success: true,
-    message: "Aposta recebida"
-  });
 });
 
 app.listen(PORT, () => {
