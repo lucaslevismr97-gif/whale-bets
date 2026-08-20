@@ -29,7 +29,7 @@ app.get("/bets", async (req, res) => {
 
     const orders = Array.isArray(data)
       ? data
-      : data.data  data.orders  [];
+      : data.data || data.orders || [];
 
     const whales = orders
       .filter(order => {
