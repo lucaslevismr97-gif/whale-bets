@@ -5,55 +5,107 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// US$ 100.000 em USDC (6 casas decimais)
-const MIN_BET_SIZE = 100000000000;
+// US$ 100.000 em USDC, com 6 casas decimais
+const MIN_USD = 100000;
+const MIN_BET_SIZE = BigInt(MIN_USD * 1000000);
 
 app.get("/", (req, res) => {
   res.json({
     app: "Whale Bets",
     status: "online",
     source: "SX Bet",
-    minimum_usd: 100000
+    minimum_usd: MIN_USD
   });
 });
 
 app.get("/bets", async (req, res) => {
   try {
-    const response = await fetch("https://api.sx.bet/orders");
+    // 1. Buscar mercados ativos
+    const marketsResponse = await fetch(
+      "https://api.sx.bet/markets/active"
+    );
 
-    if (!response.ok) {
-      throw new Error(`SX Bet respondeu ${response.status}`);
+    if (!marketsResponse.ok) {
+      throw new Error(
+        Erro ao buscar mercados: ${marketsResponse.status}
+      );
     }
 
-    const data = await response.json();
+    const marketsData = await marketsResponse.json();
 
-    const orders = Array.isArray(data)
-      ? data
-      : data.data || data.orders || [];
+    const markets = marketsData?.data?.markets || [];
 
-    const whales = orders
-      .filter(order => {
-        const size = BigInt(order.totalBetSize || "0");
-        return size >= BigInt(MIN_BET_SIZE);
-      })
-      .filter(order => order.orderStatus === "ACTIVE")
-      .map(order => ({
-        marketHash: order.marketHash,
-        orderHash: order.orderHash,
-        value_usd: Number(order.totalBetSize) / 1000000,
-        odds: Number(order.percentageOdds) / 1000000000000000000,
-        eventId: order.sportXeventId,
-        status: order.orderStatus
-      }))
-      .sort((a, b) => b.value_usd - a.value_usd);
+    const whales = [];
 
-    res.json(whales);
+    // 2. Consultar as ordens dos mercados
+    for (const market of markets.slice(0, 50)) {
+      try {
+        const ordersResponse = await fetch(
+          https://api.sx.bet/orders?marketHash=${market.marketHash}
+        );
+
+        if (!ordersResponse.ok) continue;
+
+        const ordersData = await ordersResponse.json();
+
+        const orders = Array.isArray(ordersData)
+          ? ordersData
+          : ordersData?.data  ordersData?.orders  [];
+
+        // 3. Filtrar grandes ordens
+        for (const order of orders) {
+          if (order.orderStatus !== "ACTIVE") continue;
+
+          const size = BigInt(order.totalBetSize || "0");
+
+          if (size < MIN_BET_SIZE) continue;
+
+          // 4. Converter para dólares
+          const valueUsd = Number(size) / 1000000;
+
+          whales.push({
+            value_usd: valueUsd,
+            odds:
+              Number(order.percentageOdds || 0) /
+              1000000000000000000,
+
+            sport: market.sportLabel,
+            league: market.leagueLabel,
+
+            team_one: market.teamOneName,
+            team_two: market.teamTwoName,
+
+            outcome_one: market.outcomeOneName,
+            outcome_two: market.outcomeTwoName,
+
+            market_hash: market.marketHash,
+            order_hash: order.orderHash,
+            event_id: market.sportXeventId,
+
+            game_time: market.gameTime,
+
+            status: order.orderStatus
+          });
+        }
+      } catch (error) {
+        console.error(
+          Erro no mercado ${market.marketHash}:,
+          error.message
+        );
+      }
+    }
+
+    // 5. Ordenar pelas maiores ordens
+    whales.sort((a, b) => b.value_usd - a.value_usd);
+
+    // 6. Limitar resultado
+    res.json(whales.slice(0, 100));
 
   } catch (error) {
     console.error(error);
 
     res.status(500).json({
-      error: "Não foi possível consultar a SX Bet",
+      error: "Erro ao consultar a SX Bet",
       details: error.message
     });
   }
