@@ -16,19 +16,27 @@ app.get("/bets", async (req, res) => {
     const data = await response.json();
 
     const markets = data.data.markets || [];
+const market = markets[0];
 
-    res.json({
-      quantidade_mercados: markets.length,
-      primeiro_mercado: markets[0] || null
-    });
+if (!market) {
+  return res.json([]);
+}
 
-  } catch (error) {
-    res.status(500).json({
-      erro: error.message
-    });
-  }
-});
+const ordersResponse = await fetch(
+  "https://api.sx.bet/orders?marketHash=" + market.marketHash
+);
 
-app.listen(PORT, () => {
-  console.log("Whale Bets online na porta " + PORT);
+const ordersData = await ordersResponse.json();
+
+const orders = ordersData.data || ordersData.orders || [];
+
+res.json({
+  mercado: {
+    esporte: market.sportLabel,
+    liga: market.leagueLabel,
+    time1: market.teamOneName,
+    time2: market.teamTwoName,
+    marketHash: market.marketHash
+  },
+  ordens: orders
 });
