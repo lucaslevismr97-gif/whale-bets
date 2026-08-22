@@ -12,8 +12,7 @@ app.get("/", (req, res) => {
   res.json({
     app: "Whale Bets",
     status: "online",
-    source: "SX Bet",
-    minimum_usd: MIN_USD
+    source: "SX Bet"
   });
 });
 
@@ -25,18 +24,23 @@ app.get("/bets", async (req, res) => {
 
     if (!marketsResponse.ok) {
       throw new Error(
-        "Erro ao buscar mercados: " + marketsResponse.status
+        "Erro ao buscar mercados: " +
+        marketsResponse.status
       );
     }
 
     const marketsData = await marketsResponse.json();
 
-    const markets = marketsData?.data?.markets || [];
+    const markets =
+      marketsData?.data?.markets || [];
+
+    let totalMarkets = markets.length;
+    let totalOrders = 0;
+    let ordersAbove100k = 0;
 
     const whales = [];
 
-    // Limita a 50 mercados por consulta para evitar sobrecarregar o serviço
-    for (const market of markets.slice(0, 50)) {
+    for (const market of markets) {
       if (!market.marketHash) continue;
 
       try {
@@ -47,17 +51,27 @@ app.get("/bets", async (req, res) => {
 
         if (!ordersResponse.ok) continue;
 
-        const ordersData = await ordersResponse.json();
+        const ordersData =
+          await ordersResponse.json();
 
         const orders =
           ordersData?.data ||
           ordersData?.orders ||
           [];
 
-        for (const order of orders) {
-          if (order.orderStatus !== "ACTIVE") continue;
+        totalOrders += orders.length;
 
-          if (order.marketHash !== market.marketHash) continue;
+        for (const order of orders) {
+          if (order.orderStatus !== "ACTIVE") {
+            continue;
+          }
+
+          if (
+            order.marketHash &&
+            order.marketHash !== market.marketHash
+          ) {
+            continue;
+          }
 
           const totalBetSize = Number(
             order.totalBetSize || 0
@@ -68,36 +82,50 @@ app.get("/bets", async (req, res) => {
 
           if (valueUsd < MIN_USD) continue;
 
-          const odds =
-            Number(order.percentageOdds || 0) /
-            1000000000000000000;
+          ordersAbove100k++;
 
           whales.push({
             value_usd: valueUsd,
-            odds: odds,
 
-            esporte: market.sportLabel || "",
-            liga: market.leagueLabel || "",
+            odds:
+              Number(order.percentageOdds || 0) /
+              1000000000000000000,
 
-            time1: market.teamOneName || "",
-            time2: market.teamTwoName || "",
+            esporte:
+              market.sportLabel || "",
 
-            outcome1: market.outcomeOneName || "",
-            outcome2: market.outcomeTwoName || "",
+            liga:
+              market.leagueLabel || "",
 
-            marketHash: market.marketHash,
-            orderHash: order.orderHash,
+            time1:
+              market.teamOneName || "",
 
-            eventId: market.sportXeventId,
+            time2:
+              market.teamTwoName || "",
 
-            gameTime: market.gameTime,
+            outcome1:
+              market.outcomeOneName || "",
 
-            status: order.orderStatus
+            outcome2:
+              market.outcomeTwoName || "",
+
+            marketHash:
+              market.marketHash,
+
+            orderHash:
+              order.orderHash,
+
+            eventId:
+              market.sportXeventId,
+
+            status:
+              order.orderStatus
           });
         }
+
       } catch (error) {
         console.log(
-          "Erro ao consultar mercado:",
+          "Erro no mercado:",
           error.message
         );
       }
@@ -107,7 +135,16 @@ app.get("/bets", async (req, res) => {
       (a, b) => b.value_usd - a.value_usd
     );
 
-    res.json(whales.slice(0, 100));
+    res.json({
+      resumo: {
+        mercados_encontrados: totalMarkets,
+        ordens_encontradas: totalOrders,
+        ordens_acima_de_100_mil:
+          ordersAbove100k
+      },
+
+      whales: whales.slice(0, 100)
+    });
 
   } catch (error) {
     console.error(error);
