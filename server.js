@@ -27,7 +27,7 @@ app.get("/bets", async (req, res) => {
 
     if (!marketsResponse.ok) {
       throw new Error(
-        Erro ao buscar mercados: ${marketsResponse.status}
+        `Erro ao buscar mercados: ${marketsResponse.status}`
       );
     }
 
